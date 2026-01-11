@@ -1,0 +1,41 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    name: Build Travel Agent Bot
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore TravelAgent/TravelAgent.csproj
+
+    - name: Build
+      run: dotnet build TravelAgent/TravelAgent.csproj --configuration Release --no-restore
+
+    - name: Test
+      run: dotnet test TravelAgent/TravelAgent.csproj --configuration Release --no-build --verbosity normal
+
+    - name: Publish
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: dotnet publish TravelAgent/TravelAgent.csproj --configuration Release --no-build --output ./publish
+
+    - name: Upload artifacts
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: actions/upload-artifact@v3
+      with:
+        name: travel-agent-bot
+        path: ./publish
