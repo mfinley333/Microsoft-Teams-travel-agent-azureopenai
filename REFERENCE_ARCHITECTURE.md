@@ -924,9 +924,9 @@ Azure OpenAI
 
 6. User consents (delegated permissions)
    "This app wants to:
-    • Read your profile
-    • Read your files
-    • Read your calendar"
+    Â• Read your profile
+    Â• Read your files
+    Â• Read your calendar"
    [Accept]
    ?
 
@@ -1337,15 +1337,6 @@ scopes: 'User.Read Files.Read Calendars.Read'  // Delegated permissions
 - [Managed Identities](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/)
 - [Private Endpoints](https://learn.microsoft.com/en-us/azure/private-link/private-endpoint-overview)
 
-### Related Documentation
-
-- `SESSION_COMPLETE_SUMMARY.md` - Complete session overview
-- `FIX_APIM_JWT_AUDIENCE_VALIDATION.md` - JWT validation fix details
-- `FIX_APP_SERVICE_403_ACCESS_RESTRICTIONS.md` - Access restrictions fix
-- `BICEP_ROLE_ASSIGNMENT_ADDED.md` - Managed Identity role assignment
-- `ENABLE_SSO_WITHOUT_ADMIN_CONSENT.md` - OAuth configuration
-- `BOT_SERVICE_NOT_IN_VNET.md` - Bot Service architecture explanation
-
 ---
 
 ## ?? Revision History
@@ -1381,9 +1372,4 @@ This reference architecture provides:
 - Comprehensive documentation
 - Clear separation of concerns
 
-? **Cost Optimization**
-- Basic/Developer tiers for non-production
-- Pay-per-use for Azure OpenAI
-- Free Bot Service tier
 
-**This architecture is production-ready and follows Azure best practices.** ??
