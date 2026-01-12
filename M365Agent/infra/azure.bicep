@@ -243,28 +243,6 @@ module azureBotRegistration './botRegistration/azurebot.bicep' = {
   }
 }
 
-// Deploy Private Endpoint for Bot Service (after Bot Service is created)
-// ?? DISABLED: Private Endpoint for Bot Service breaks Teams channel communication
-// Bot Service must be publicly accessible for Bot Framework Service to route messages from Teams
-// Private Endpoints are only for DirectLine Speech/WebChat scenarios, not Teams channels
-/*
-module botServicePrivateEndpoint './botservice-privateendpoint.bicep' = if (deployVNet) {
-  name: 'botservice-privateendpoint-deployment'
-  params: {
-    resourceBaseName: resourceBaseName
-    location: location
-    botServiceName: resourceBaseName
-    vnetId: networking.outputs.vnetId
-    privateEndpointsSubnetId: networking.outputs.privateEndpointsSubnetId
-    botServicePrivateDnsZoneId: networking.outputs.botServicePrivateDnsZoneId
-  }
-  dependsOn: [
-    azureBotRegistration
-    networking
-  ]
-}
-*/
-
 // The output will be persisted in .env.{envName}. Visit https://aka.ms/teamsfx-actions/arm-deploy for more details.
 output BOT_AZURE_APP_SERVICE_RESOURCE_ID string = deployAppService ? webApp.id : ''
 output BOT_DOMAIN string = deployVNet && deployAppService ? replace(apim.outputs.apimFQDN, 'https://', '') : (deployAppService ? webApp.properties.defaultHostName : botDomain)
