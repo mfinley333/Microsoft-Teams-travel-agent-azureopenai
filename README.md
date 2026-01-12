@@ -1,3 +1,4 @@
+ORIGINAL Sample Setup
 # Getting Started with Travel Agent
 
 This sample demonstrates how to build an intelligent travel agent using the Microsoft 365 Agents Toolkit. The agent provides comprehensive travel assistance by answering travel-related questions, helping users understand company travel policies, and finding flights and hotels that comply with organizational guidelines.
