@@ -331,29 +331,6 @@ resource openAIDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLink
   }
 }
 
-// Private DNS Zone for Azure Bot Service
-// ⚠️ DISABLED: Not needed when Bot Service doesn't have Private Endpoint
-// Bot Service must remain publicly accessible for Teams channel communication
-/*
-resource botServiceDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
-  name: 'privatelink.botframework.com'
-  location: 'global'
-}
-
-// Link Bot Service Private DNS Zone to VNet
-resource botServiceDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
-  parent: botServiceDnsZone
-  name: '${resourceBaseName}-botservice-vnet-link'
-  location: 'global'
-  properties: {
-    registrationEnabled: false
-    virtualNetwork: {
-      id: vnet.id
-    }
-  }
-}
-*/
-
 // Private Endpoint for Azure OpenAI
 resource openAIPrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-05-01' = {
   name: '${resourceBaseName}-openai-pe'
@@ -400,5 +377,3 @@ output apimSubnetId string = '${vnet.id}/subnets/apim-subnet'
 output privateEndpointsSubnetId string = '${vnet.id}/subnets/privateendpoints-subnet'
 output openAIPrivateEndpointId string = openAIPrivateEndpoint.id
 output privateDnsZoneId string = openAIDnsZone.id
-// output botServicePrivateDnsZoneId string = botServiceDnsZone.id
-// ⚠️ DISABLED: Not needed without Bot Service Private Endpoint
