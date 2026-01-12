@@ -252,5 +252,3 @@ output APIM_GATEWAY_URL string = deployVNet && deployAppService ? apim.outputs.a
 output APIM_PUBLIC_IP string = deployVNet && deployAppService ? apim.outputs.apimPublicIP : ''
 output BOT_MESSAGES_ENDPOINT string = deployVNet && deployAppService ? apim.outputs.botMessagesEndpoint : ''
 output VNET_ID string = deployVNet ? networking.outputs.vnetId : ''
-// output BOT_SERVICE_PRIVATE_ENDPOINT_ID string = deployVNet ? botServicePrivateEndpoint.outputs.botServicePrivateEndpointId : ''
-// ?? DISABLED: Bot Service Private Endpoint not used for Teams channels
