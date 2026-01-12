@@ -55,7 +55,11 @@ resource botServiceOAuthConnection 'Microsoft.BotService/botServices/Connections
   properties: {
     clientId: botConnectionClientId
     clientSecret: botConnectionClientSecret
-    scopes: 'Files.Read.All Sites.Read.All'
+    // Use delegated permissions that don't require admin consent
+    // User.Read - Read user profile (no admin consent needed)
+    // Files.Read - Read user's files (no admin consent needed)
+    // Calendars.Read - Read user's calendar (no admin consent needed)
+    scopes: 'User.Read Files.Read Calendars.Read'
     serviceProviderDisplayName: 'Azure Active Directory v2'
     serviceProviderId: '30dd229c-58e3-4a48-bdfd-91ec48eb906c'
     parameters: [
