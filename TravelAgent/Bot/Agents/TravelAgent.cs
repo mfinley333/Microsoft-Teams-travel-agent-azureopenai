@@ -45,7 +45,8 @@ public class TravelAgent
     /// <param name="chatClient">An instance of <see cref="IChatClient"/> for interacting with an LLM.</param>
     /// <param name="app">The agent application instance.</param>
     /// <param name="turnContext">The turn context for the current conversation.</param>
-    public TravelAgent(IChatClient chatClient, AgentApplication app, ITurnContext turnContext)
+    /// <param name="configuration">Application configuration for accessing AAD settings.</param>
+    public TravelAgent(IChatClient chatClient, AgentApplication app, ITurnContext turnContext, IConfiguration configuration)
     {
         var tools = new List<AITool>();
         
@@ -58,7 +59,7 @@ public class TravelAgent
         var dataPlugin = new DataPlugin();
         tools.Add(AIFunctionFactory.Create(dataPlugin.GetHotelFlightDataAsync));
         
-        var retrievalPlugin = new RetrievalPlugin(app, turnContext);
+        var retrievalPlugin = new RetrievalPlugin(app, turnContext, configuration);
         tools.Add(AIFunctionFactory.Create(retrievalPlugin.BuildRetrievalAsync));
 
         _agent = chatClient.CreateAIAgent(instructions: AgentInstructions, tools: tools);

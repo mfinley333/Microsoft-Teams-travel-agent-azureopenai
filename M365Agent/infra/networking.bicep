@@ -19,6 +19,9 @@ param apimSubnetPrefix string = '10.0.2.0/24'
 @description('Private endpoints subnet prefix')
 param privateEndpointsSubnetPrefix string = '10.0.3.0/24'
 
+@description('Azure Firewall subnet prefix (must be named AzureFirewallSubnet)')
+param firewallSubnetPrefix string = '10.0.4.0/26'
+
 @description('Azure OpenAI resource name (existing)')
 param azureOpenAIResourceName string
 
@@ -26,7 +29,7 @@ param azureOpenAIResourceName string
 param azureOpenAIResourceGroup string = resourceGroup().name
 
 // Network Security Group for App Service Subnet
-resource appServiceNSG 'Microsoft.Network/networkSecurityGroups@2023-05-01' = {
+resource appServiceNSG 'Microsoft.Network/networkSecurityGroups@2021-05-01' = {
   name: '${resourceBaseName}-appservice-nsg'
   location: location
   properties: {
@@ -106,7 +109,7 @@ resource appServiceNSG 'Microsoft.Network/networkSecurityGroups@2023-05-01' = {
 }
 
 // Network Security Group for APIM Subnet
-resource apimNSG 'Microsoft.Network/networkSecurityGroups@2023-05-01' = {
+resource apimNSG 'Microsoft.Network/networkSecurityGroups@2021-05-01' = {
   name: '${resourceBaseName}-apim-nsg'
   location: location
   properties: {
@@ -214,7 +217,7 @@ resource apimNSG 'Microsoft.Network/networkSecurityGroups@2023-05-01' = {
 }
 
 // Network Security Group for Private Endpoints Subnet
-resource privateEndpointsNSG 'Microsoft.Network/networkSecurityGroups@2023-05-01' = {
+resource privateEndpointsNSG 'Microsoft.Network/networkSecurityGroups@2021-05-01' = {
   name: '${resourceBaseName}-pe-nsg'
   location: location
   properties: {
@@ -252,7 +255,7 @@ resource privateEndpointsNSG 'Microsoft.Network/networkSecurityGroups@2023-05-01
 }
 
 // Virtual Network with NSGs attached to subnets
-resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
+resource vnet 'Microsoft.Network/virtualNetworks@2021-05-01' = {
   name: '${resourceBaseName}-vnet'
   location: location
   properties: {
@@ -303,6 +306,14 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
           privateEndpointNetworkPolicies: 'Disabled'
         }
       }
+      {
+        name: 'AzureFirewallSubnet'  // Reserved name - must be exactly this
+        properties: {
+          addressPrefix: firewallSubnetPrefix
+          serviceEndpoints: []
+          privateEndpointNetworkPolicies: 'Disabled'
+        }
+      }
     ]
   }
   dependsOn: [
@@ -331,31 +342,8 @@ resource openAIDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLink
   }
 }
 
-// Private DNS Zone for Azure Bot Service
-// ⚠️ DISABLED: Not needed when Bot Service doesn't have Private Endpoint
-// Bot Service must remain publicly accessible for Teams channel communication
-/*
-resource botServiceDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
-  name: 'privatelink.botframework.com'
-  location: 'global'
-}
-
-// Link Bot Service Private DNS Zone to VNet
-resource botServiceDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
-  parent: botServiceDnsZone
-  name: '${resourceBaseName}-botservice-vnet-link'
-  location: 'global'
-  properties: {
-    registrationEnabled: false
-    virtualNetwork: {
-      id: vnet.id
-    }
-  }
-}
-*/
-
 // Private Endpoint for Azure OpenAI
-resource openAIPrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-05-01' = {
+resource openAIPrivateEndpoint 'Microsoft.Network/privateEndpoints@2021-05-01' = {
   name: '${resourceBaseName}-openai-pe'
   location: location
   properties: {
@@ -377,7 +365,7 @@ resource openAIPrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-05-01' =
 }
 
 // Private DNS Zone Group for OpenAI Private Endpoint
-resource openAIPrivateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-05-01' = {
+resource openAIPrivateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2021-05-01' = {
   parent: openAIPrivateEndpoint
   name: 'default'
   properties: {
@@ -398,7 +386,7 @@ output vnetName string = vnet.name
 output appServiceSubnetId string = '${vnet.id}/subnets/appservice-subnet'
 output apimSubnetId string = '${vnet.id}/subnets/apim-subnet'
 output privateEndpointsSubnetId string = '${vnet.id}/subnets/privateendpoints-subnet'
+output firewallSubnetId string = '${vnet.id}/subnets/AzureFirewallSubnet'
 output openAIPrivateEndpointId string = openAIPrivateEndpoint.id
 output privateDnsZoneId string = openAIDnsZone.id
-// output botServicePrivateDnsZoneId string = botServiceDnsZone.id
-// ⚠️ DISABLED: Not needed without Bot Service Private Endpoint
+

@@ -1,7 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.22/MicrosoftTeams.schema.json",
   "manifestVersion": "1.22",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "id": "${{TEAMS_APP_ID}}",
   "developer": {
     "name": "MFIN Teams App, Inc.",
@@ -14,12 +14,12 @@
     "outline": "outline.png"
   },
   "name": {
-    "short": "Travel Agent 1.2-APIM VNet",
-    "full": "Travel Agent Bot with Secure VNet and APIM"
+    "short": "Travel Agent 2.0-APIM VNet SSO",
+    "full": "Travel Agent Bot with Secure VNet and APIM with SSO keyvault"
   },
   "description": {
     "short": "AI Travel Assistant with Enterprise Security",
-    "full": "Travel Agent Bot with Azure VNet, APIM reverse proxy, and private endpoints for enterprise-grade security"
+    "full": "Travel Agent Bot with SSO, Azure VNet, APIM reverse proxy, and private endpoints for enterprise-grade security"
   },
   "accentColor": "#FFFFFF",
   "copilotAgents": {
@@ -67,8 +67,7 @@
       ]
     }
   ],
-  "composeExtensions": [
-  ],
+  "composeExtensions": [],
   "configurableTabs": [],
   "staticTabs": [],
   "permissions": [
@@ -81,5 +80,9 @@
     "login.microsoftonline.com",
     "bot220214-apim.azure-api.net",
     "*.azure-api.net"
-  ]
+  ],
+  "webApplicationInfo": {
+    "id": "5abe3c7b-6635-4dfd-a683-cce68ebe9098",
+    "resource": "api://5abe3c7b-6635-4dfd-a683-cce68ebe9098"
+  }
 }

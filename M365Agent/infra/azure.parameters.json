@@ -35,6 +35,12 @@
     "deployVNet": {
       "value": true
     },
+    "deployFirewall": {
+      "value": false
+    },
+    "deployKeyVault": {
+      "value": true
+    },
     "azureOpenAIResourceName": {
       "value": "aif-travelagent-bot"
     },

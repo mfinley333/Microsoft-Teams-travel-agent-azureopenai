@@ -1,0 +1,2392 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.9.1.41621",
+      "templateHash": "207448440047228244"
+    }
+  },
+  "parameters": {
+    "resourceBaseName": {
+      "type": "string",
+      "metadata": {
+        "description": "Used to generate names for all resources in this file"
+      },
+      "minLength": 4,
+      "maxLength": 20
+    },
+    "azureOpenAIEndpoint": {
+      "type": "string"
+    },
+    "azureOpenAIDeploymentName": {
+      "type": "string"
+    },
+    "useManagedIdentity": {
+      "type": "string",
+      "defaultValue": "true"
+    },
+    "webAppSKU": {
+      "type": "string"
+    },
+    "botDisplayName": {
+      "type": "string",
+      "maxLength": 42
+    },
+    "environment": {
+      "type": "string"
+    },
+    "botDomain": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "deployAppService": {
+      "type": "bool",
+      "defaultValue": "[not(equals(parameters('environment'), 'local'))]"
+    },
+    "aadAppClientId": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "aadAppClientSecret": {
+      "type": "secureString",
+      "defaultValue": ""
+    },
+    "aadAppTenantId": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "deployVNet": {
+      "type": "bool",
+      "defaultValue": true
+    },
+    "deployFirewall": {
+      "type": "bool",
+      "defaultValue": true
+    },
+    "deployKeyVault": {
+      "type": "bool",
+      "defaultValue": true
+    },
+    "azureOpenAIResourceName": {
+      "type": "string",
+      "defaultValue": "aif-travelagent-bot"
+    },
+    "azureOpenAIResourceGroup": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().name]"
+    },
+    "publisherEmail": {
+      "type": "string",
+      "defaultValue": "admin@travelagent.com"
+    },
+    "publisherName": {
+      "type": "string",
+      "defaultValue": "Travel Agent Bot"
+    },
+    "apimSku": {
+      "type": "string",
+      "defaultValue": "Developer"
+    },
+    "createRoleAssignment": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "serverfarmsName": {
+      "type": "string",
+      "defaultValue": "[parameters('resourceBaseName')]"
+    },
+    "webAppName": {
+      "type": "string",
+      "defaultValue": "[parameters('resourceBaseName')]"
+    },
+    "identityName": {
+      "type": "string",
+      "defaultValue": "[parameters('resourceBaseName')]"
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2023-01-31",
+      "name": "[parameters('identityName')]",
+      "location": "[parameters('location')]"
+    },
+    {
+      "condition": "[parameters('deployAppService')]",
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2021-02-01",
+      "name": "[parameters('serverfarmsName')]",
+      "kind": "app",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "[parameters('webAppSKU')]"
+      }
+    },
+    {
+      "condition": "[parameters('deployAppService')]",
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2021-02-01",
+      "name": "[parameters('webAppName')]",
+      "kind": "app",
+      "location": "[parameters('location')]",
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarmsName'))]",
+        "httpsOnly": true,
+        "virtualNetworkSubnetId": "[if(parameters('deployVNet'), reference(resourceId('Microsoft.Resources/deployments', 'networking-deployment'), '2020-10-01').outputs.appServiceSubnetId.value, null())]",
+        "siteConfig": {
+          "alwaysOn": true,
+          "netFrameworkVersion": "v9.0",
+          "vnetRouteAllEnabled": "[parameters('deployVNet')]",
+          "http20Enabled": true,
+          "minTlsVersion": "1.2",
+          "ftpsState": "Disabled",
+          "appSettings": [
+            {
+              "name": "WEBSITE_RUN_FROM_PACKAGE",
+              "value": "1"
+            },
+            {
+              "name": "RUNNING_ON_AZURE",
+              "value": "1"
+            },
+            {
+              "name": "Connections__BotServiceConnection__Settings__ClientId",
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))).clientId]"
+            },
+            {
+              "name": "Connections__BotServiceConnection__Settings__TenantId",
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))).tenantId]"
+            },
+            {
+              "name": "TokenValidation__Audiences__0",
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))).clientId]"
+            },
+            {
+              "name": "Azure__OpenAIEndpoint",
+              "value": "[parameters('azureOpenAIEndpoint')]"
+            },
+            {
+              "name": "Azure__OpenAIDeploymentName",
+              "value": "[parameters('azureOpenAIDeploymentName')]"
+            },
+            {
+              "name": "Azure__UseManagedIdentity",
+              "value": "[parameters('useManagedIdentity')]"
+            },
+            {
+              "name": "Azure__ManagedIdentityClientId",
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))).clientId]"
+            },
+            {
+              "name": "AZURE_CLIENT_ID",
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))).clientId]"
+            },
+            {
+              "name": "Azure__KeyVaultUrl",
+              "value": "[if(parameters('deployKeyVault'), reference(resourceId('Microsoft.Resources/deployments', 'keyvault-deployment'), '2020-10-01').outputs.keyVaultUri.value, '')]"
+            },
+            {
+              "name": "Azure__SSOCertificateName",
+              "value": "[if(parameters('deployKeyVault'), reference(resourceId('Microsoft.Resources/deployments', 'keyvault-deployment'), '2020-10-01').outputs.certificateName.value, '')]"
+            },
+            {
+              "name": "Azure__ClientId",
+              "value": "[parameters('aadAppClientId')]"
+            },
+            {
+              "name": "Azure__TenantId",
+              "value": "[tenant().tenantId]"
+            },
+            {
+              "name": "Azure__UseCertificateAuth",
+              "value": "[if(parameters('deployKeyVault'), 'true', 'false')]"
+            },
+            {
+              "name": "WEBSITE_VNET_ROUTE_ALL",
+              "value": "[if(parameters('deployVNet'), '1', '0')]"
+            },
+            {
+              "name": "WEBSITE_DNS_SERVER",
+              "value": "168.63.129.16"
+            }
+          ]
+        }
+      },
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName')))]": {}
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))]",
+        "[resourceId('Microsoft.Resources/deployments', 'keyvault-deployment')]",
+        "[resourceId('Microsoft.Resources/deployments', 'networking-deployment')]",
+        "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarmsName'))]"
+      ]
+    },
+    {
+      "condition": "[and(parameters('deployAppService'), parameters('deployVNet'))]",
+      "type": "Microsoft.Web/sites/config",
+      "apiVersion": "2022-03-01",
+      "name": "[format('{0}/{1}', parameters('webAppName'), 'web')]",
+      "properties": {
+        "ipSecurityRestrictions": [
+          {
+            "name": "Allow-APIM-Subnet",
+            "action": "Allow",
+            "priority": 200,
+            "vnetSubnetResourceId": "[reference(resourceId('Microsoft.Resources/deployments', 'networking-deployment'), '2020-10-01').outputs.apimSubnetId.value]",
+            "description": "Allow traffic from APIM subnet (internal VNet routing)"
+          },
+          {
+            "name": "Allow-APIM-PublicIP",
+            "action": "Allow",
+            "priority": 201,
+            "ipAddress": "[format('{0}/32', reference(resourceId('Microsoft.Resources/deployments', 'apim-deployment'), '2020-10-01').outputs.apimPublicIP.value)]",
+            "description": "Allow traffic from APIM public IP (external routing)"
+          },
+          {
+            "name": "Deny-All",
+            "action": "Deny",
+            "priority": 2147483647,
+            "ipAddress": "Any",
+            "description": "Deny all other traffic - App Service accessible only via APIM"
+          }
+        ],
+        "scmIpSecurityRestrictions": [
+          {
+            "name": "Allow-All-SCM",
+            "action": "Allow",
+            "priority": 100,
+            "ipAddress": "Any",
+            "description": "Allow deployment from any IP (SCM site for Kudu/deployments)"
+          }
+        ],
+        "scmIpSecurityRestrictionsUseMain": false
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'apim-deployment')]",
+        "[resourceId('Microsoft.Resources/deployments', 'networking-deployment')]",
+        "[resourceId('Microsoft.Web/sites', parameters('webAppName'))]"
+      ]
+    },
+    {
+      "condition": "[parameters('deployKeyVault')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "keyvault-deployment",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "resourceBaseName": {
+            "value": "[parameters('resourceBaseName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "managedIdentityPrincipalId": {
+            "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))).principalId]"
+          },
+          "managedIdentityId": {
+            "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))]"
+          },
+          "tenantId": {
+            "value": "[tenant().tenantId]"
+          },
+          "deployPrivateEndpoint": {
+            "value": "[parameters('deployVNet')]"
+          },
+          "privateEndpointSubnetId": {
+            "value": "[if(parameters('deployVNet'), reference(resourceId('Microsoft.Resources/deployments', 'networking-deployment'), '2020-10-01').outputs.privateEndpointsSubnetId.value, '')]"
+          },
+          "vnetId": {
+            "value": "[if(parameters('deployVNet'), reference(resourceId('Microsoft.Resources/deployments', 'networking-deployment'), '2020-10-01').outputs.vnetId.value, '')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.9.1.41621",
+              "templateHash": "13125096043247740015"
+            }
+          },
+          "parameters": {
+            "resourceBaseName": {
+              "type": "string",
+              "metadata": {
+                "description": "Base name for resources"
+              }
+            },
+            "location": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().location]",
+              "metadata": {
+                "description": "Location for all resources"
+              }
+            },
+            "managedIdentityPrincipalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Managed Identity Principal ID that needs access"
+              }
+            },
+            "managedIdentityId": {
+              "type": "string",
+              "metadata": {
+                "description": "Managed Identity Resource ID"
+              }
+            },
+            "tenantId": {
+              "type": "string",
+              "defaultValue": "[tenant().tenantId]",
+              "metadata": {
+                "description": "Azure AD Tenant ID"
+              }
+            },
+            "enableSoftDelete": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Enable soft delete for Key Vault"
+              }
+            },
+            "createCertificate": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Create SSO certificate (set to false to skip if certificate already exists)"
+              }
+            },
+            "softDeleteRetentionInDays": {
+              "type": "int",
+              "defaultValue": 90,
+              "metadata": {
+                "description": "Soft delete retention days"
+              }
+            },
+            "deployPrivateEndpoint": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Deploy private endpoint for Key Vault"
+              }
+            },
+            "privateEndpointSubnetId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Private endpoint subnet ID"
+              }
+            },
+            "vnetId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "VNet ID for private DNS zone"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults",
+              "apiVersion": "2022-07-01",
+              "name": "[format('{0}-kv', parameters('resourceBaseName'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "sku": {
+                  "family": "A",
+                  "name": "standard"
+                },
+                "tenantId": "[parameters('tenantId')]",
+                "enableRbacAuthorization": true,
+                "enableSoftDelete": "[parameters('enableSoftDelete')]",
+                "softDeleteRetentionInDays": "[parameters('softDeleteRetentionInDays')]",
+                "enabledForDeployment": false,
+                "enabledForDiskEncryption": false,
+                "enabledForTemplateDeployment": true,
+                "publicNetworkAccess": "[if(parameters('deployPrivateEndpoint'), 'Disabled', 'Enabled')]",
+                "networkAcls": {
+                  "bypass": "AzureServices",
+                  "defaultAction": "[if(parameters('deployPrivateEndpoint'), 'Deny', 'Allow')]",
+                  "virtualNetworkRules": [],
+                  "ipRules": []
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.KeyVault/vaults/{0}', format('{0}-kv', parameters('resourceBaseName')))]",
+              "name": "[guid(parameters('managedIdentityId'), resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', parameters('resourceBaseName'))), 'Key Vault Secrets User')]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')]",
+                "principalId": "[parameters('managedIdentityPrincipalId')]",
+                "principalType": "ServicePrincipal"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', parameters('resourceBaseName')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.KeyVault/vaults/{0}', format('{0}-kv', parameters('resourceBaseName')))]",
+              "name": "[guid(parameters('managedIdentityId'), resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', parameters('resourceBaseName'))), 'Key Vault Certificate User')]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'db79e9a7-68ee-4b58-9aeb-b90e7c24fcba')]",
+                "principalId": "[parameters('managedIdentityPrincipalId')]",
+                "principalType": "ServicePrincipal"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', parameters('resourceBaseName')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.KeyVault/vaults/{0}', format('{0}-kv', parameters('resourceBaseName')))]",
+              "name": "[guid(parameters('managedIdentityId'), resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', parameters('resourceBaseName'))), 'Key Vault Crypto User')]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '12338af0-0e69-4776-bea7-57ae8d297424')]",
+                "principalId": "[parameters('managedIdentityPrincipalId')]",
+                "principalType": "ServicePrincipal"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', parameters('resourceBaseName')))]"
+              ]
+            },
+            {
+              "condition": "[parameters('createCertificate')]",
+              "type": "Microsoft.KeyVault/vaults/certificates",
+              "apiVersion": "2022-07-01",
+              "name": "[format('{0}/{1}', format('{0}-kv', parameters('resourceBaseName')), 'bot-sso-cert')]",
+              "properties": {
+                "certificatePolicy": {
+                  "issuerParameters": {
+                    "name": "Self"
+                  },
+                  "keyProperties": {
+                    "exportable": true,
+                    "keySize": 2048,
+                    "keyType": "RSA",
+                    "reuseKey": false
+                  },
+                  "lifetimeActions": [
+                    {
+                      "action": {
+                        "actionType": "AutoRenew"
+                      },
+                      "trigger": {
+                        "daysBeforeExpiry": 90
+                      }
+                    }
+                  ],
+                  "secretProperties": {
+                    "contentType": "application/x-pkcs12"
+                  },
+                  "x509CertificateProperties": {
+                    "keyUsage": [
+                      "cRLSign",
+                      "dataEncipherment",
+                      "digitalSignature",
+                      "keyEncipherment",
+                      "keyAgreement",
+                      "keyCertSign"
+                    ],
+                    "subject": "[format('CN=bot-sso-{0}', parameters('resourceBaseName'))]",
+                    "validityInMonths": 12,
+                    "ekus": [
+                      "1.3.6.1.5.5.7.3.1",
+                      "1.3.6.1.5.5.7.3.2"
+                    ],
+                    "subjectAlternativeNames": {
+                      "dnsNames": [
+                        "[format('{0}.azurewebsites.net', parameters('resourceBaseName'))]"
+                      ]
+                    }
+                  }
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', parameters('resourceBaseName')))]"
+              ]
+            },
+            {
+              "condition": "[and(parameters('deployPrivateEndpoint'), not(empty(parameters('privateEndpointSubnetId'))))]",
+              "type": "Microsoft.Network/privateEndpoints",
+              "apiVersion": "2021-05-01",
+              "name": "[format('{0}-kv-pe', parameters('resourceBaseName'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "subnet": {
+                  "id": "[parameters('privateEndpointSubnetId')]"
+                },
+                "privateLinkServiceConnections": [
+                  {
+                    "name": "[format('{0}-kv-plsc', parameters('resourceBaseName'))]",
+                    "properties": {
+                      "privateLinkServiceId": "[resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', parameters('resourceBaseName')))]",
+                      "groupIds": [
+                        "vault"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', parameters('resourceBaseName')))]"
+              ]
+            },
+            {
+              "condition": "[and(parameters('deployPrivateEndpoint'), not(empty(parameters('vnetId'))))]",
+              "type": "Microsoft.Network/privateDnsZones",
+              "apiVersion": "2020-06-01",
+              "name": "privatelink.vaultcore.azure.net",
+              "location": "global"
+            },
+            {
+              "condition": "[and(parameters('deployPrivateEndpoint'), not(empty(parameters('vnetId'))))]",
+              "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+              "apiVersion": "2020-06-01",
+              "name": "[format('{0}/{1}', 'privatelink.vaultcore.azure.net', format('{0}-kv-dns-link', parameters('resourceBaseName')))]",
+              "location": "global",
+              "properties": {
+                "registrationEnabled": false,
+                "virtualNetwork": {
+                  "id": "[parameters('vnetId')]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.vaultcore.azure.net')]"
+              ]
+            },
+            {
+              "condition": "[and(parameters('deployPrivateEndpoint'), not(empty(parameters('privateEndpointSubnetId'))))]",
+              "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+              "apiVersion": "2021-05-01",
+              "name": "[format('{0}/{1}', format('{0}-kv-pe', parameters('resourceBaseName')), 'default')]",
+              "properties": {
+                "privateDnsZoneConfigs": [
+                  {
+                    "name": "privatelink-vaultcore-azure-net",
+                    "properties": {
+                      "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.vaultcore.azure.net')]"
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.vaultcore.azure.net')]",
+                "[resourceId('Microsoft.Network/privateEndpoints', format('{0}-kv-pe', parameters('resourceBaseName')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "keyVaultId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', parameters('resourceBaseName')))]"
+            },
+            "keyVaultName": {
+              "type": "string",
+              "value": "[format('{0}-kv', parameters('resourceBaseName'))]"
+            },
+            "keyVaultUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', parameters('resourceBaseName')))).vaultUri]"
+            },
+            "certificateName": {
+              "type": "string",
+              "value": "[if(parameters('createCertificate'), 'bot-sso-cert', 'bot-sso-cert')]"
+            },
+            "certificateSecretId": {
+              "type": "string",
+              "value": "[format('{0}secrets/{1}', reference(resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', parameters('resourceBaseName')))).vaultUri, if(parameters('createCertificate'), 'bot-sso-cert', 'bot-sso-cert'))]"
+            },
+            "certificateId": {
+              "type": "string",
+              "value": "[if(parameters('createCertificate'), reference(resourceId('Microsoft.KeyVault/vaults/certificates', format('{0}-kv', parameters('resourceBaseName')), 'bot-sso-cert'), '2022-07-01').secretId, format('{0}secrets/bot-sso-cert', reference(resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', parameters('resourceBaseName')))).vaultUri))]"
+            },
+            "privateEndpointId": {
+              "type": "string",
+              "value": "[if(parameters('deployPrivateEndpoint'), resourceId('Microsoft.Network/privateEndpoints', format('{0}-kv-pe', parameters('resourceBaseName'))), '')]"
+            },
+            "privateDnsZoneId": {
+              "type": "string",
+              "value": "[if(parameters('deployPrivateEndpoint'), resourceId('Microsoft.Network/privateDnsZones', 'privatelink.vaultcore.azure.net'), '')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))]",
+        "[resourceId('Microsoft.Resources/deployments', 'networking-deployment')]"
+      ]
+    },
+    {
+      "condition": "[parameters('createRoleAssignment')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "openai-role-assignment",
+      "resourceGroup": "[parameters('azureOpenAIResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "openAIAccountName": {
+            "value": "[parameters('azureOpenAIResourceName')]"
+          },
+          "managedIdentityPrincipalId": {
+            "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))).principalId]"
+          },
+          "roleDefinitionId": {
+            "value": "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.9.1.41621",
+              "templateHash": "5265341616767486772"
+            }
+          },
+          "parameters": {
+            "openAIAccountName": {
+              "type": "string"
+            },
+            "managedIdentityPrincipalId": {
+              "type": "string"
+            },
+            "roleDefinitionId": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.CognitiveServices/accounts/{0}', parameters('openAIAccountName'))]",
+              "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('openAIAccountName')), parameters('managedIdentityPrincipalId'), parameters('roleDefinitionId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('roleDefinitionId'))]",
+                "principalId": "[parameters('managedIdentityPrincipalId')]",
+                "principalType": "ServicePrincipal"
+              }
+            }
+          ],
+          "outputs": {
+            "roleAssignmentId": {
+              "type": "string",
+              "value": "[extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', parameters('openAIAccountName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('openAIAccountName')), parameters('managedIdentityPrincipalId'), parameters('roleDefinitionId')))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))]"
+      ]
+    },
+    {
+      "condition": "[parameters('deployVNet')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "networking-deployment",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "resourceBaseName": {
+            "value": "[parameters('resourceBaseName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "azureOpenAIResourceName": {
+            "value": "[parameters('azureOpenAIResourceName')]"
+          },
+          "azureOpenAIResourceGroup": {
+            "value": "[parameters('azureOpenAIResourceGroup')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.9.1.41621",
+              "templateHash": "734636261685795792"
+            }
+          },
+          "parameters": {
+            "resourceBaseName": {
+              "type": "string",
+              "metadata": {
+                "description": "Base name for resources"
+              }
+            },
+            "location": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().location]",
+              "metadata": {
+                "description": "Location for all resources"
+              }
+            },
+            "vnetAddressPrefix": {
+              "type": "string",
+              "defaultValue": "10.0.0.0/16",
+              "metadata": {
+                "description": "VNet address prefix"
+              }
+            },
+            "appServiceSubnetPrefix": {
+              "type": "string",
+              "defaultValue": "10.0.1.0/24",
+              "metadata": {
+                "description": "App Service integration subnet prefix"
+              }
+            },
+            "apimSubnetPrefix": {
+              "type": "string",
+              "defaultValue": "10.0.2.0/24",
+              "metadata": {
+                "description": "APIM subnet prefix"
+              }
+            },
+            "privateEndpointsSubnetPrefix": {
+              "type": "string",
+              "defaultValue": "10.0.3.0/24",
+              "metadata": {
+                "description": "Private endpoints subnet prefix"
+              }
+            },
+            "firewallSubnetPrefix": {
+              "type": "string",
+              "defaultValue": "10.0.4.0/26",
+              "metadata": {
+                "description": "Azure Firewall subnet prefix (must be named AzureFirewallSubnet)"
+              }
+            },
+            "azureOpenAIResourceName": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure OpenAI resource name (existing)"
+              }
+            },
+            "azureOpenAIResourceGroup": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().name]",
+              "metadata": {
+                "description": "Azure OpenAI resource group (if different)"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/networkSecurityGroups",
+              "apiVersion": "2021-05-01",
+              "name": "[format('{0}-appservice-nsg', parameters('resourceBaseName'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "securityRules": [
+                  {
+                    "name": "AllowAPIMInbound",
+                    "properties": {
+                      "description": "Allow inbound from APIM subnet",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "[parameters('apimSubnetPrefix')]",
+                      "destinationAddressPrefix": "[parameters('appServiceSubnetPrefix')]",
+                      "access": "Allow",
+                      "priority": 100,
+                      "direction": "Inbound"
+                    }
+                  },
+                  {
+                    "name": "AllowBotServiceOutbound",
+                    "properties": {
+                      "description": "Allow outbound to Bot Framework Service via Private Endpoint",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "[parameters('appServiceSubnetPrefix')]",
+                      "destinationAddressPrefix": "[parameters('privateEndpointsSubnetPrefix')]",
+                      "access": "Allow",
+                      "priority": 100,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AllowBotServiceFallbackOutbound",
+                    "properties": {
+                      "description": "Allow outbound to Bot Framework Service (fallback to public endpoint)",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "[parameters('appServiceSubnetPrefix')]",
+                      "destinationAddressPrefix": "AzureBotService",
+                      "access": "Allow",
+                      "priority": 105,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AllowAzureADOutbound",
+                    "properties": {
+                      "description": "Allow outbound to Azure AD",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "[parameters('appServiceSubnetPrefix')]",
+                      "destinationAddressPrefix": "AzureActiveDirectory",
+                      "access": "Allow",
+                      "priority": 110,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AllowAzureOpenAIOutbound",
+                    "properties": {
+                      "description": "Allow outbound to Azure OpenAI via Private Endpoint",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "[parameters('appServiceSubnetPrefix')]",
+                      "destinationAddressPrefix": "[parameters('privateEndpointsSubnetPrefix')]",
+                      "access": "Allow",
+                      "priority": 120,
+                      "direction": "Outbound"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.Network/networkSecurityGroups",
+              "apiVersion": "2021-05-01",
+              "name": "[format('{0}-apim-nsg', parameters('resourceBaseName'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "securityRules": [
+                  {
+                    "name": "AllowHTTPSInbound",
+                    "properties": {
+                      "description": "Allow inbound HTTPS from Internet (Teams/Bot Service)",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "Internet",
+                      "destinationAddressPrefix": "[parameters('apimSubnetPrefix')]",
+                      "access": "Allow",
+                      "priority": 100,
+                      "direction": "Inbound"
+                    }
+                  },
+                  {
+                    "name": "AllowAPIMManagementInbound",
+                    "properties": {
+                      "description": "Allow APIM management endpoint",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "3443",
+                      "sourceAddressPrefix": "ApiManagement",
+                      "destinationAddressPrefix": "VirtualNetwork",
+                      "access": "Allow",
+                      "priority": 110,
+                      "direction": "Inbound"
+                    }
+                  },
+                  {
+                    "name": "AllowLoadBalancerInbound",
+                    "properties": {
+                      "description": "Allow Azure Load Balancer",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "6390",
+                      "sourceAddressPrefix": "AzureLoadBalancer",
+                      "destinationAddressPrefix": "VirtualNetwork",
+                      "access": "Allow",
+                      "priority": 120,
+                      "direction": "Inbound"
+                    }
+                  },
+                  {
+                    "name": "AllowAppServiceOutbound",
+                    "properties": {
+                      "description": "Allow outbound to App Service subnet",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "[parameters('apimSubnetPrefix')]",
+                      "destinationAddressPrefix": "[parameters('appServiceSubnetPrefix')]",
+                      "access": "Allow",
+                      "priority": 100,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AllowStorageOutbound",
+                    "properties": {
+                      "description": "Allow outbound to Azure Storage",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "[parameters('apimSubnetPrefix')]",
+                      "destinationAddressPrefix": "Storage",
+                      "access": "Allow",
+                      "priority": 110,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AllowSQLOutbound",
+                    "properties": {
+                      "description": "Allow outbound to Azure SQL",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "1433",
+                      "sourceAddressPrefix": "[parameters('apimSubnetPrefix')]",
+                      "destinationAddressPrefix": "Sql",
+                      "access": "Allow",
+                      "priority": 120,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AllowKeyVaultOutbound",
+                    "properties": {
+                      "description": "Allow outbound to Key Vault",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "[parameters('apimSubnetPrefix')]",
+                      "destinationAddressPrefix": "AzureKeyVault",
+                      "access": "Allow",
+                      "priority": 130,
+                      "direction": "Outbound"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.Network/networkSecurityGroups",
+              "apiVersion": "2021-05-01",
+              "name": "[format('{0}-pe-nsg', parameters('resourceBaseName'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "securityRules": [
+                  {
+                    "name": "AllowAppServiceInbound",
+                    "properties": {
+                      "description": "Allow inbound from App Service subnet",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "[parameters('appServiceSubnetPrefix')]",
+                      "destinationAddressPrefix": "[parameters('privateEndpointsSubnetPrefix')]",
+                      "access": "Allow",
+                      "priority": 100,
+                      "direction": "Inbound"
+                    }
+                  },
+                  {
+                    "name": "AllowAPIMInbound",
+                    "properties": {
+                      "description": "Allow inbound from APIM subnet for Bot Service connectivity",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "[parameters('apimSubnetPrefix')]",
+                      "destinationAddressPrefix": "[parameters('privateEndpointsSubnetPrefix')]",
+                      "access": "Allow",
+                      "priority": 110,
+                      "direction": "Inbound"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.Network/virtualNetworks",
+              "apiVersion": "2021-05-01",
+              "name": "[format('{0}-vnet', parameters('resourceBaseName'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "addressSpace": {
+                  "addressPrefixes": [
+                    "[parameters('vnetAddressPrefix')]"
+                  ]
+                },
+                "subnets": [
+                  {
+                    "name": "appservice-subnet",
+                    "properties": {
+                      "addressPrefix": "[parameters('appServiceSubnetPrefix')]",
+                      "networkSecurityGroup": {
+                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-appservice-nsg', parameters('resourceBaseName')))]"
+                      },
+                      "delegations": [
+                        {
+                          "name": "delegation",
+                          "properties": {
+                            "serviceName": "Microsoft.Web/serverFarms"
+                          }
+                        }
+                      ],
+                      "serviceEndpoints": [],
+                      "privateEndpointNetworkPolicies": "Disabled"
+                    }
+                  },
+                  {
+                    "name": "apim-subnet",
+                    "properties": {
+                      "addressPrefix": "[parameters('apimSubnetPrefix')]",
+                      "networkSecurityGroup": {
+                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-apim-nsg', parameters('resourceBaseName')))]"
+                      },
+                      "serviceEndpoints": [],
+                      "privateEndpointNetworkPolicies": "Disabled"
+                    }
+                  },
+                  {
+                    "name": "privateendpoints-subnet",
+                    "properties": {
+                      "addressPrefix": "[parameters('privateEndpointsSubnetPrefix')]",
+                      "networkSecurityGroup": {
+                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-pe-nsg', parameters('resourceBaseName')))]"
+                      },
+                      "serviceEndpoints": [],
+                      "privateEndpointNetworkPolicies": "Disabled"
+                    }
+                  },
+                  {
+                    "name": "AzureFirewallSubnet",
+                    "properties": {
+                      "addressPrefix": "[parameters('firewallSubnetPrefix')]",
+                      "serviceEndpoints": [],
+                      "privateEndpointNetworkPolicies": "Disabled"
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-apim-nsg', parameters('resourceBaseName')))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-appservice-nsg', parameters('resourceBaseName')))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-pe-nsg', parameters('resourceBaseName')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/privateDnsZones",
+              "apiVersion": "2020-06-01",
+              "name": "privatelink.openai.azure.com",
+              "location": "global"
+            },
+            {
+              "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+              "apiVersion": "2020-06-01",
+              "name": "[format('{0}/{1}', 'privatelink.openai.azure.com', format('{0}-openai-vnet-link', parameters('resourceBaseName')))]",
+              "location": "global",
+              "properties": {
+                "registrationEnabled": false,
+                "virtualNetwork": {
+                  "id": "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('resourceBaseName')))]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.openai.azure.com')]",
+                "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('resourceBaseName')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/privateEndpoints",
+              "apiVersion": "2021-05-01",
+              "name": "[format('{0}-openai-pe', parameters('resourceBaseName'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "subnet": {
+                  "id": "[format('{0}/subnets/privateendpoints-subnet', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('resourceBaseName'))))]"
+                },
+                "privateLinkServiceConnections": [
+                  {
+                    "name": "[format('{0}-openai-plsc', parameters('resourceBaseName'))]",
+                    "properties": {
+                      "privateLinkServiceId": "[resourceId(parameters('azureOpenAIResourceGroup'), 'Microsoft.CognitiveServices/accounts', parameters('azureOpenAIResourceName'))]",
+                      "groupIds": [
+                        "account"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('resourceBaseName')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+              "apiVersion": "2021-05-01",
+              "name": "[format('{0}/{1}', format('{0}-openai-pe', parameters('resourceBaseName')), 'default')]",
+              "properties": {
+                "privateDnsZoneConfigs": [
+                  {
+                    "name": "config1",
+                    "properties": {
+                      "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.openai.azure.com')]"
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.openai.azure.com')]",
+                "[resourceId('Microsoft.Network/privateEndpoints', format('{0}-openai-pe', parameters('resourceBaseName')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "vnetId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('resourceBaseName')))]"
+            },
+            "vnetName": {
+              "type": "string",
+              "value": "[format('{0}-vnet', parameters('resourceBaseName'))]"
+            },
+            "appServiceSubnetId": {
+              "type": "string",
+              "value": "[format('{0}/subnets/appservice-subnet', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('resourceBaseName'))))]"
+            },
+            "apimSubnetId": {
+              "type": "string",
+              "value": "[format('{0}/subnets/apim-subnet', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('resourceBaseName'))))]"
+            },
+            "privateEndpointsSubnetId": {
+              "type": "string",
+              "value": "[format('{0}/subnets/privateendpoints-subnet', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('resourceBaseName'))))]"
+            },
+            "firewallSubnetId": {
+              "type": "string",
+              "value": "[format('{0}/subnets/AzureFirewallSubnet', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('resourceBaseName'))))]"
+            },
+            "openAIPrivateEndpointId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/privateEndpoints', format('{0}-openai-pe', parameters('resourceBaseName')))]"
+            },
+            "privateDnsZoneId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.openai.azure.com')]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "condition": "[and(parameters('deployVNet'), parameters('deployAppService'))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "apim-deployment",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "resourceBaseName": {
+            "value": "[parameters('resourceBaseName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "apimSubnetId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'networking-deployment'), '2020-10-01').outputs.apimSubnetId.value]"
+          },
+          "backendBotUrl": {
+            "value": "[format('https://{0}', reference(resourceId('Microsoft.Web/sites', parameters('webAppName')), '2021-02-01').defaultHostName)]"
+          },
+          "publisherEmail": {
+            "value": "[parameters('publisherEmail')]"
+          },
+          "publisherName": {
+            "value": "[parameters('publisherName')]"
+          },
+          "apimSku": {
+            "value": "[parameters('apimSku')]"
+          },
+          "managedIdentityClientId": {
+            "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))).clientId]"
+          },
+          "managedIdentityResourceId": {
+            "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.9.1.41621",
+              "templateHash": "949361850067552962"
+            }
+          },
+          "parameters": {
+            "resourceBaseName": {
+              "type": "string",
+              "metadata": {
+                "description": "Base name for resources"
+              }
+            },
+            "location": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().location]",
+              "metadata": {
+                "description": "Location for all resources"
+              }
+            },
+            "apimSubnetId": {
+              "type": "string",
+              "metadata": {
+                "description": "APIM subnet ID"
+              }
+            },
+            "backendBotUrl": {
+              "type": "string",
+              "metadata": {
+                "description": "App Service backend URL (internal)"
+              }
+            },
+            "publisherEmail": {
+              "type": "string",
+              "metadata": {
+                "description": "Publisher email for APIM"
+              }
+            },
+            "publisherName": {
+              "type": "string",
+              "metadata": {
+                "description": "Publisher name/organization"
+              }
+            },
+            "apimSku": {
+              "type": "string",
+              "defaultValue": "Developer",
+              "allowedValues": [
+                "Developer",
+                "Premium",
+                "Standard"
+              ],
+              "metadata": {
+                "description": "APIM SKU"
+              }
+            },
+            "apimCapacity": {
+              "type": "int",
+              "defaultValue": 1,
+              "metadata": {
+                "description": "APIM capacity"
+              }
+            },
+            "customDomainName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Custom domain name for APIM (optional)"
+              }
+            },
+            "managedIdentityClientId": {
+              "type": "string",
+              "metadata": {
+                "description": "Managed Identity Client ID for backend auth"
+              }
+            },
+            "managedIdentityResourceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Managed Identity Resource ID for APIM"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/publicIPAddresses",
+              "apiVersion": "2021-05-01",
+              "name": "[format('{0}-apim-pip', parameters('resourceBaseName'))]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "Standard"
+              },
+              "properties": {
+                "publicIPAllocationMethod": "Static",
+                "dnsSettings": {
+                  "domainNameLabel": "[format('{0}-apim', parameters('resourceBaseName'))]"
+                }
+              }
+            },
+            {
+              "type": "Microsoft.ApiManagement/service",
+              "apiVersion": "2021-08-01",
+              "name": "[format('{0}-apim', parameters('resourceBaseName'))]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "[parameters('apimSku')]",
+                "capacity": "[parameters('apimCapacity')]"
+              },
+              "properties": {
+                "publisherEmail": "[parameters('publisherEmail')]",
+                "publisherName": "[parameters('publisherName')]",
+                "virtualNetworkType": "External",
+                "virtualNetworkConfiguration": {
+                  "subnetResourceId": "[parameters('apimSubnetId')]"
+                },
+                "publicIpAddressId": "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-apim-pip', parameters('resourceBaseName')))]",
+                "customProperties": {
+                  "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls11": "false",
+                  "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls10": "false",
+                  "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Ssl30": "false",
+                  "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls11": "false",
+                  "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls10": "false",
+                  "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Ssl30": "false",
+                  "Microsoft.WindowsAzure.ApiManagement.Gateway.Protocols.Server.Http2": "true"
+                }
+              },
+              "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {
+                  "[format('{0}', parameters('managedIdentityResourceId'))]": {}
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-apim-pip', parameters('resourceBaseName')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.ApiManagement/service/backends",
+              "apiVersion": "2021-08-01",
+              "name": "[format('{0}/{1}', format('{0}-apim', parameters('resourceBaseName')), 'travel-agent-bot-backend')]",
+              "properties": {
+                "description": "Travel Agent Bot App Service Backend",
+                "url": "[parameters('backendBotUrl')]",
+                "protocol": "http",
+                "tls": {
+                  "validateCertificateChain": true,
+                  "validateCertificateName": true
+                },
+                "credentials": {
+                  "header": {
+                    "X-Managed-Identity-ClientId": [
+                      "[parameters('managedIdentityClientId')]"
+                    ]
+                  }
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ApiManagement/service', format('{0}-apim', parameters('resourceBaseName')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.ApiManagement/service/apis",
+              "apiVersion": "2021-08-01",
+              "name": "[format('{0}/{1}', format('{0}-apim', parameters('resourceBaseName')), 'travel-agent-bot-api')]",
+              "properties": {
+                "displayName": "Travel Agent Bot API",
+                "description": "API for Microsoft Teams Travel Agent Bot",
+                "path": "",
+                "protocols": [
+                  "https"
+                ],
+                "subscriptionRequired": false,
+                "isCurrent": true,
+                "serviceUrl": "[parameters('backendBotUrl')]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ApiManagement/service', format('{0}-apim', parameters('resourceBaseName')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.ApiManagement/service/apis/operations",
+              "apiVersion": "2021-08-01",
+              "name": "[format('{0}/{1}/{2}', format('{0}-apim', parameters('resourceBaseName')), 'travel-agent-bot-api', 'post-messages')]",
+              "properties": {
+                "displayName": "Post Messages",
+                "method": "POST",
+                "urlTemplate": "/api/messages",
+                "description": "Receives messages from Microsoft Teams via Bot Framework",
+                "request": {
+                  "headers": [
+                    {
+                      "name": "Authorization",
+                      "description": "Bot Framework JWT token",
+                      "type": "string",
+                      "required": true
+                    }
+                  ]
+                },
+                "responses": [
+                  {
+                    "statusCode": 200,
+                    "description": "Success"
+                  },
+                  {
+                    "statusCode": 401,
+                    "description": "Unauthorized"
+                  },
+                  {
+                    "statusCode": 500,
+                    "description": "Internal Server Error"
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ApiManagement/service/apis', format('{0}-apim', parameters('resourceBaseName')), 'travel-agent-bot-api')]"
+              ]
+            },
+            {
+              "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+              "apiVersion": "2021-08-01",
+              "name": "[format('{0}/{1}/{2}/{3}', format('{0}-apim', parameters('resourceBaseName')), 'travel-agent-bot-api', 'post-messages', 'policy')]",
+              "properties": {
+                "value": "[format('<policies>\r\n  <inbound>\r\n    <base />\r\n    <!-- Validate JWT token from Bot Framework -->\r\n    <validate-jwt header-name=\"Authorization\" \r\n                  failed-validation-httpcode=\"401\" \r\n                  failed-validation-error-message=\"Unauthorized. Invalid or missing Bot Framework token.\"\r\n                  require-expiration-time=\"true\"\r\n                  require-scheme=\"Bearer\"\r\n                  require-signed-tokens=\"true\">\r\n      <openid-config url=\"https://login.botframework.com/v1/.well-known/openidconfiguration\" />\r\n      <audiences>\r\n        <audience>{0}</audience>\r\n        <audience>https://{1}-apim.azure-api.net</audience>\r\n        <audience>https://api.botframework.com</audience>\r\n      </audiences>\r\n      <issuers>\r\n        <issuer>https://api.botframework.com</issuer>\r\n      </issuers>\r\n    </validate-jwt>\r\n    \r\n    <!-- Rate limiting: 100 calls per minute per client -->\r\n    <rate-limit-by-key calls=\"100\" renewal-period=\"60\" counter-key=\"@(context.Request.IpAddress)\" />\r\n    \r\n    <!-- Set backend service -->\r\n    <set-backend-service backend-id=\"travel-agent-bot-backend\" />\r\n    \r\n    <!-- Forward all headers -->\r\n    <set-header name=\"X-Forwarded-For\" exists-action=\"override\">\r\n      <value>@(context.Request.IpAddress)</value>\r\n    </set-header>\r\n    <set-header name=\"X-Forwarded-Proto\" exists-action=\"override\">\r\n      <value>https</value>\r\n    </set-header>\r\n  </inbound>\r\n  <backend>\r\n    <base />\r\n  </backend>\r\n  <outbound>\r\n    <base />\r\n    <!-- Add security headers -->\r\n    <set-header name=\"X-Content-Type-Options\" exists-action=\"override\">\r\n      <value>nosniff</value>\r\n    </set-header>\r\n    <set-header name=\"X-Frame-Options\" exists-action=\"override\">\r\n      <value>DENY</value>\r\n    </set-header>\r\n    <set-header name=\"Strict-Transport-Security\" exists-action=\"override\">\r\n      <value>max-age=31536000; includeSubDomains</value>\r\n    </set-header>\r\n  </outbound>\r\n  <on-error>\r\n    <base />\r\n  </on-error>\r\n</policies>\r\n', parameters('managedIdentityClientId'), parameters('resourceBaseName'))]",
+                "format": "xml"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ApiManagement/service/apis/operations', format('{0}-apim', parameters('resourceBaseName')), 'travel-agent-bot-api', 'post-messages')]"
+              ]
+            },
+            {
+              "type": "Microsoft.ApiManagement/service/policies",
+              "apiVersion": "2023-05-01-preview",
+              "name": "[format('{0}/{1}', format('{0}-apim', parameters('resourceBaseName')), 'policy')]",
+              "properties": {
+                "value": "<policies>\r\n  <inbound>\r\n    <!-- CORS policy for development/testing -->\r\n    <cors allow-credentials=\"false\">\r\n      <allowed-origins>\r\n        <origin>https://teams.microsoft.com</origin>\r\n      </allowed-origins>\r\n      <allowed-methods>\r\n        <method>POST</method>\r\n        <method>GET</method>\r\n      </allowed-methods>\r\n      <allowed-headers>\r\n        <header>*</header>\r\n      </allowed-headers>\r\n    </cors>\r\n  </inbound>\r\n  <backend>\r\n    <forward-request />\r\n  </backend>\r\n  <outbound />\r\n  <on-error />\r\n</policies>\r\n",
+                "format": "xml"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ApiManagement/service', format('{0}-apim', parameters('resourceBaseName')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "apimId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.ApiManagement/service', format('{0}-apim', parameters('resourceBaseName')))]"
+            },
+            "apimName": {
+              "type": "string",
+              "value": "[format('{0}-apim', parameters('resourceBaseName'))]"
+            },
+            "apimGatewayUrl": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.ApiManagement/service', format('{0}-apim', parameters('resourceBaseName')))).gatewayUrl]"
+            },
+            "apimPublicIP": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-apim-pip', parameters('resourceBaseName')))).ipAddress]"
+            },
+            "apimFQDN": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-apim-pip', parameters('resourceBaseName')))).dnsSettings.fqdn]"
+            },
+            "apimManagedIdentityPrincipalId": {
+              "type": "string",
+              "value": "[parameters('managedIdentityClientId')]"
+            },
+            "botMessagesEndpoint": {
+              "type": "string",
+              "value": "[format('{0}/api/messages', reference(resourceId('Microsoft.ApiManagement/service', format('{0}-apim', parameters('resourceBaseName')))).gatewayUrl)]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))]",
+        "[resourceId('Microsoft.Resources/deployments', 'networking-deployment')]",
+        "[resourceId('Microsoft.Web/sites', parameters('webAppName'))]"
+      ]
+    },
+    {
+      "condition": "[and(parameters('deployVNet'), parameters('deployFirewall'))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "firewall-deployment",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "resourceBaseName": {
+            "value": "[parameters('resourceBaseName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "firewallSubnetId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'networking-deployment'), '2020-10-01').outputs.firewallSubnetId.value]"
+          },
+          "firewallSku": {
+            "value": "Standard"
+          },
+          "firewallTier": {
+            "value": "Standard"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.9.1.41621",
+              "templateHash": "3762193831375169017"
+            }
+          },
+          "parameters": {
+            "resourceBaseName": {
+              "type": "string",
+              "metadata": {
+                "description": "Base name for resources"
+              }
+            },
+            "location": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().location]",
+              "metadata": {
+                "description": "Location for all resources"
+              }
+            },
+            "firewallSubnetId": {
+              "type": "string",
+              "metadata": {
+                "description": "Firewall subnet ID (AzureFirewallSubnet)"
+              }
+            },
+            "firewallSku": {
+              "type": "string",
+              "defaultValue": "Standard",
+              "allowedValues": [
+                "Standard",
+                "Premium"
+              ],
+              "metadata": {
+                "description": "Azure Firewall SKU"
+              }
+            },
+            "firewallTier": {
+              "type": "string",
+              "defaultValue": "Standard",
+              "allowedValues": [
+                "Standard",
+                "Premium"
+              ],
+              "metadata": {
+                "description": "Azure Firewall tier"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/publicIPAddresses",
+              "apiVersion": "2021-05-01",
+              "name": "[format('{0}-fw-pip', parameters('resourceBaseName'))]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "Standard"
+              },
+              "properties": {
+                "publicIPAllocationMethod": "Static",
+                "publicIPAddressVersion": "IPv4"
+              }
+            },
+            {
+              "type": "Microsoft.Network/azureFirewalls",
+              "apiVersion": "2021-05-01",
+              "name": "[format('{0}-fw', parameters('resourceBaseName'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "sku": {
+                  "name": "AZFW_VNet",
+                  "tier": "[parameters('firewallTier')]"
+                },
+                "ipConfigurations": [
+                  {
+                    "name": "firewallIpConfig",
+                    "properties": {
+                      "subnet": {
+                        "id": "[parameters('firewallSubnetId')]"
+                      },
+                      "publicIPAddress": {
+                        "id": "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-fw-pip', parameters('resourceBaseName')))]"
+                      }
+                    }
+                  }
+                ],
+                "threatIntelMode": "Alert",
+                "firewallPolicy": {
+                  "id": "[resourceId('Microsoft.Network/firewallPolicies', format('{0}-fw-policy', parameters('resourceBaseName')))]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/firewallPolicies', format('{0}-fw-policy', parameters('resourceBaseName')))]",
+                "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-fw-pip', parameters('resourceBaseName')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/firewallPolicies",
+              "apiVersion": "2021-05-01",
+              "name": "[format('{0}-fw-policy', parameters('resourceBaseName'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "sku": {
+                  "tier": "[parameters('firewallTier')]"
+                },
+                "threatIntelMode": "Alert"
+              }
+            },
+            {
+              "type": "Microsoft.Network/firewallPolicies/ruleCollectionGroups",
+              "apiVersion": "2021-05-01",
+              "name": "[format('{0}/{1}', format('{0}-fw-policy', parameters('resourceBaseName')), 'ApplicationRuleCollectionGroup')]",
+              "properties": {
+                "priority": 100,
+                "ruleCollections": [
+                  {
+                    "name": "AzureServices",
+                    "priority": 100,
+                    "ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+                    "action": {
+                      "type": "Allow"
+                    },
+                    "rules": [
+                      {
+                        "name": "AllowAzureOpenAI",
+                        "ruleType": "ApplicationRule",
+                        "protocols": [
+                          {
+                            "protocolType": "Https",
+                            "port": 443
+                          }
+                        ],
+                        "fqdnTags": [],
+                        "targetFqdns": [
+                          "*.openai.azure.com",
+                          "openai.azure.com"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ]
+                      },
+                      {
+                        "name": "AllowBotFramework",
+                        "ruleType": "ApplicationRule",
+                        "protocols": [
+                          {
+                            "protocolType": "Https",
+                            "port": 443
+                          }
+                        ],
+                        "fqdnTags": [],
+                        "targetFqdns": [
+                          "token.botframework.com",
+                          "api.botframework.com",
+                          "login.botframework.com"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ]
+                      },
+                      {
+                        "name": "AllowAzureAD",
+                        "ruleType": "ApplicationRule",
+                        "protocols": [
+                          {
+                            "protocolType": "Https",
+                            "port": 443
+                          }
+                        ],
+                        "fqdnTags": [],
+                        "targetFqdns": [
+                          "login.microsoftonline.com",
+                          "login.windows.net",
+                          "login.microsoft.com",
+                          "*.login.microsoft.com",
+                          "graph.microsoft.com",
+                          "*.graph.microsoft.com"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ]
+                      },
+                      {
+                        "name": "AllowMicrosoft365",
+                        "ruleType": "ApplicationRule",
+                        "protocols": [
+                          {
+                            "protocolType": "Https",
+                            "port": 443
+                          }
+                        ],
+                        "fqdnTags": [],
+                        "targetFqdns": [
+                          "*.teams.microsoft.com",
+                          "teams.microsoft.com",
+                          "*.office.com",
+                          "*.office365.com",
+                          "*.microsoftonline.com",
+                          "*.skype.com",
+                          "*.outlook.com"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ]
+                      },
+                      {
+                        "name": "AllowAzureManagement",
+                        "ruleType": "ApplicationRule",
+                        "protocols": [
+                          {
+                            "protocolType": "Https",
+                            "port": 443
+                          }
+                        ],
+                        "fqdnTags": [],
+                        "targetFqdns": [
+                          "management.azure.com",
+                          "*.management.azure.com",
+                          "portal.azure.com",
+                          "*.portal.azure.com"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ]
+                      },
+                      {
+                        "name": "AllowAzureStorage",
+                        "ruleType": "ApplicationRule",
+                        "protocols": [
+                          {
+                            "protocolType": "Https",
+                            "port": 443
+                          }
+                        ],
+                        "fqdnTags": [],
+                        "targetFqdns": [
+                          "*.blob.core.windows.net",
+                          "*.table.core.windows.net",
+                          "*.queue.core.windows.net",
+                          "*.file.core.windows.net"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ]
+                      },
+                      {
+                        "name": "AllowAzureKeyVault",
+                        "ruleType": "ApplicationRule",
+                        "protocols": [
+                          {
+                            "protocolType": "Https",
+                            "port": 443
+                          }
+                        ],
+                        "fqdnTags": [],
+                        "targetFqdns": [
+                          "*.vault.azure.net",
+                          "vault.azure.net"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ]
+                      },
+                      {
+                        "name": "AllowAzureMonitor",
+                        "ruleType": "ApplicationRule",
+                        "protocols": [
+                          {
+                            "protocolType": "Https",
+                            "port": 443
+                          }
+                        ],
+                        "fqdnTags": [],
+                        "targetFqdns": [
+                          "*.applicationinsights.azure.com",
+                          "*.monitor.azure.com",
+                          "dc.services.visualstudio.com",
+                          "*.in.applicationinsights.azure.com"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ]
+                      },
+                      {
+                        "name": "AllowCertificateServices",
+                        "ruleType": "ApplicationRule",
+                        "protocols": [
+                          {
+                            "protocolType": "Http",
+                            "port": 80
+                          }
+                        ],
+                        "fqdnTags": [],
+                        "targetFqdns": [
+                          "ocsp.digicert.com",
+                          "crl3.digicert.com",
+                          "crl4.digicert.com",
+                          "ocsp.msocsp.com",
+                          "mscrl.microsoft.com",
+                          "crl.microsoft.com",
+                          "oneocsp.microsoft.com",
+                          "cacerts.digicert.com"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ]
+                      },
+                      {
+                        "name": "AllowNuGetPackages",
+                        "ruleType": "ApplicationRule",
+                        "protocols": [
+                          {
+                            "protocolType": "Https",
+                            "port": 443
+                          }
+                        ],
+                        "fqdnTags": [],
+                        "targetFqdns": [
+                          "api.nuget.org",
+                          "*.nuget.org",
+                          "nuget.org"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "AppServiceDependencies",
+                    "priority": 110,
+                    "ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+                    "action": {
+                      "type": "Allow"
+                    },
+                    "rules": [
+                      {
+                        "name": "AllowAppServiceManagement",
+                        "ruleType": "ApplicationRule",
+                        "protocols": [
+                          {
+                            "protocolType": "Https",
+                            "port": 443
+                          }
+                        ],
+                        "fqdnTags": [],
+                        "targetFqdns": [
+                          "*.azurewebsites.net",
+                          "*.scm.azurewebsites.net",
+                          "azurewebsites.net"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ]
+                      },
+                      {
+                        "name": "AllowWindowsUpdate",
+                        "ruleType": "ApplicationRule",
+                        "protocols": [
+                          {
+                            "protocolType": "Https",
+                            "port": 443
+                          },
+                          {
+                            "protocolType": "Http",
+                            "port": 80
+                          }
+                        ],
+                        "fqdnTags": [
+                          "WindowsUpdate"
+                        ],
+                        "targetFqdns": [],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ]
+                      },
+                      {
+                        "name": "AllowAppServiceEnvironment",
+                        "ruleType": "ApplicationRule",
+                        "protocols": [
+                          {
+                            "protocolType": "Https",
+                            "port": 443
+                          }
+                        ],
+                        "fqdnTags": [
+                          "AppServiceEnvironment"
+                        ],
+                        "targetFqdns": [],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "AIAndCognitiveServices",
+                    "priority": 120,
+                    "ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+                    "action": {
+                      "type": "Allow"
+                    },
+                    "rules": [
+                      {
+                        "name": "AllowCognitiveServices",
+                        "ruleType": "ApplicationRule",
+                        "protocols": [
+                          {
+                            "protocolType": "Https",
+                            "port": 443
+                          }
+                        ],
+                        "fqdnTags": [],
+                        "targetFqdns": [
+                          "*.cognitiveservices.azure.com",
+                          "cognitiveservices.azure.com",
+                          "*.api.cognitive.microsoft.com"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/firewallPolicies', format('{0}-fw-policy', parameters('resourceBaseName')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/firewallPolicies/ruleCollectionGroups",
+              "apiVersion": "2021-05-01",
+              "name": "[format('{0}/{1}', format('{0}-fw-policy', parameters('resourceBaseName')), 'NetworkRuleCollectionGroup')]",
+              "properties": {
+                "priority": 200,
+                "ruleCollections": [
+                  {
+                    "name": "AzureServiceTags",
+                    "priority": 200,
+                    "ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+                    "action": {
+                      "type": "Allow"
+                    },
+                    "rules": [
+                      {
+                        "name": "AllowAzureCloud",
+                        "ruleType": "NetworkRule",
+                        "ipProtocols": [
+                          "TCP"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ],
+                        "destinationAddresses": [
+                          "AzureCloud"
+                        ],
+                        "destinationPorts": [
+                          "443"
+                        ]
+                      },
+                      {
+                        "name": "AllowAzureActiveDirectory",
+                        "ruleType": "NetworkRule",
+                        "ipProtocols": [
+                          "TCP"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ],
+                        "destinationAddresses": [
+                          "AzureActiveDirectory"
+                        ],
+                        "destinationPorts": [
+                          "443"
+                        ]
+                      },
+                      {
+                        "name": "AllowAzureCognitiveServices",
+                        "ruleType": "NetworkRule",
+                        "ipProtocols": [
+                          "TCP"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ],
+                        "destinationAddresses": [
+                          "CognitiveServicesManagement"
+                        ],
+                        "destinationPorts": [
+                          "443"
+                        ]
+                      },
+                      {
+                        "name": "AllowAzureMonitor",
+                        "ruleType": "NetworkRule",
+                        "ipProtocols": [
+                          "TCP"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ],
+                        "destinationAddresses": [
+                          "AzureMonitor"
+                        ],
+                        "destinationPorts": [
+                          "443"
+                        ]
+                      },
+                      {
+                        "name": "AllowStorage",
+                        "ruleType": "NetworkRule",
+                        "ipProtocols": [
+                          "TCP"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ],
+                        "destinationAddresses": [
+                          "Storage"
+                        ],
+                        "destinationPorts": [
+                          "443"
+                        ]
+                      },
+                      {
+                        "name": "AllowKeyVault",
+                        "ruleType": "NetworkRule",
+                        "ipProtocols": [
+                          "TCP"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ],
+                        "destinationAddresses": [
+                          "AzureKeyVault"
+                        ],
+                        "destinationPorts": [
+                          "443"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "DNSAndNTP",
+                    "priority": 210,
+                    "ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+                    "action": {
+                      "type": "Allow"
+                    },
+                    "rules": [
+                      {
+                        "name": "AllowDNS",
+                        "ruleType": "NetworkRule",
+                        "ipProtocols": [
+                          "UDP"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ],
+                        "destinationAddresses": [
+                          "168.63.129.16"
+                        ],
+                        "destinationPorts": [
+                          "53"
+                        ]
+                      },
+                      {
+                        "name": "AllowNTP",
+                        "ruleType": "NetworkRule",
+                        "ipProtocols": [
+                          "UDP"
+                        ],
+                        "sourceAddresses": [
+                          "10.0.0.0/16"
+                        ],
+                        "destinationAddresses": [
+                          "*"
+                        ],
+                        "destinationPorts": [
+                          "123"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/firewallPolicies/ruleCollectionGroups', format('{0}-fw-policy', parameters('resourceBaseName')), 'ApplicationRuleCollectionGroup')]",
+                "[resourceId('Microsoft.Network/firewallPolicies', format('{0}-fw-policy', parameters('resourceBaseName')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "firewallId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/azureFirewalls', format('{0}-fw', parameters('resourceBaseName')))]"
+            },
+            "firewallName": {
+              "type": "string",
+              "value": "[format('{0}-fw', parameters('resourceBaseName'))]"
+            },
+            "firewallPrivateIP": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Network/azureFirewalls', format('{0}-fw', parameters('resourceBaseName')))).ipConfigurations[0].properties.privateIPAddress]"
+            },
+            "firewallPublicIP": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-fw-pip', parameters('resourceBaseName')))).ipAddress]"
+            },
+            "firewallPolicyId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/firewallPolicies', format('{0}-fw-policy', parameters('resourceBaseName')))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'networking-deployment')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "Azure-Bot-registration",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "deployAppService": {
+            "value": "[parameters('deployAppService')]"
+          },
+          "resourceBaseName": {
+            "value": "[parameters('resourceBaseName')]"
+          },
+          "identityClientId": {
+            "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))).clientId]"
+          },
+          "identityResourceId": {
+            "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))]"
+          },
+          "identityTenantId": {
+            "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))).tenantId]"
+          },
+          "botAppDomain": {
+            "value": "[if(and(parameters('deployVNet'), parameters('deployAppService')), replace(reference(resourceId('Microsoft.Resources/deployments', 'apim-deployment'), '2020-10-01').outputs.apimFQDN.value, 'https://', ''), if(parameters('deployAppService'), reference(resourceId('Microsoft.Web/sites', parameters('webAppName')), '2021-02-01').defaultHostName, parameters('botDomain')))]"
+          },
+          "botDisplayName": {
+            "value": "[parameters('botDisplayName')]"
+          },
+          "botConnectionClientId": {
+            "value": "[parameters('aadAppClientId')]"
+          },
+          "botConnectionClientSecret": {
+            "value": "[parameters('aadAppClientSecret')]"
+          },
+          "botConnectionTenantId": {
+            "value": "[parameters('aadAppTenantId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.9.1.41621",
+              "templateHash": "991828920385905017"
+            }
+          },
+          "parameters": {
+            "resourceBaseName": {
+              "type": "string",
+              "metadata": {
+                "description": "Used to generate names for all resources in this file"
+              },
+              "minLength": 4,
+              "maxLength": 20
+            },
+            "botDisplayName": {
+              "type": "string",
+              "maxLength": 42
+            },
+            "botServiceName": {
+              "type": "string",
+              "defaultValue": "[parameters('resourceBaseName')]"
+            },
+            "botServiceSku": {
+              "type": "string",
+              "defaultValue": "F0"
+            },
+            "identityResourceId": {
+              "type": "string"
+            },
+            "identityClientId": {
+              "type": "string"
+            },
+            "identityTenantId": {
+              "type": "string"
+            },
+            "botAppDomain": {
+              "type": "string"
+            },
+            "deployAppService": {
+              "type": "bool"
+            },
+            "botConnectionClientId": {
+              "type": "string"
+            },
+            "botConnectionClientSecret": {
+              "type": "secureString"
+            },
+            "botConnectionTenantId": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.BotService/botServices",
+              "apiVersion": "2021-03-01",
+              "name": "[parameters('botServiceName')]",
+              "kind": "azurebot",
+              "location": "global",
+              "properties": {
+                "displayName": "[parameters('botDisplayName')]",
+                "endpoint": "[format('https://{0}/api/messages', parameters('botAppDomain'))]",
+                "msaAppId": "[if(parameters('deployAppService'), parameters('identityClientId'), parameters('botConnectionClientId'))]",
+                "msaAppMSIResourceId": "[if(parameters('deployAppService'), parameters('identityResourceId'), '')]",
+                "msaAppTenantId": "[parameters('identityTenantId')]",
+                "msaAppType": "[if(parameters('deployAppService'), 'UserAssignedMSI', 'SingleTenant')]"
+              },
+              "sku": {
+                "name": "[parameters('botServiceSku')]"
+              }
+            },
+            {
+              "type": "Microsoft.BotService/botServices/channels",
+              "apiVersion": "2021-03-01",
+              "name": "[format('{0}/{1}', parameters('botServiceName'), 'MsTeamsChannel')]",
+              "location": "global",
+              "properties": {
+                "channelName": "MsTeamsChannel"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.BotService/botServices', parameters('botServiceName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.BotService/botServices/connections",
+              "apiVersion": "2021-03-01",
+              "name": "[format('{0}/{1}', parameters('botServiceName'), 'GraphConnection')]",
+              "location": "global",
+              "properties": {
+                "clientId": "[parameters('botConnectionClientId')]",
+                "clientSecret": "[parameters('botConnectionClientSecret')]",
+                "scopes": "User.Read Files.Read Calendars.Read",
+                "serviceProviderDisplayName": "Azure Active Directory v2",
+                "serviceProviderId": "30dd229c-58e3-4a48-bdfd-91ec48eb906c",
+                "parameters": [
+                  {
+                    "key": "tenantId",
+                    "value": "[parameters('botConnectionTenantId')]"
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.BotService/botServices', parameters('botServiceName'))]"
+              ]
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'apim-deployment')]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))]",
+        "[resourceId('Microsoft.Web/sites', parameters('webAppName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "BOT_AZURE_APP_SERVICE_RESOURCE_ID": {
+      "type": "string",
+      "value": "[if(parameters('deployAppService'), resourceId('Microsoft.Web/sites', parameters('webAppName')), '')]"
+    },
+    "BOT_DOMAIN": {
+      "type": "string",
+      "value": "[if(and(parameters('deployVNet'), parameters('deployAppService')), replace(reference(resourceId('Microsoft.Resources/deployments', 'apim-deployment'), '2020-10-01').outputs.apimFQDN.value, 'https://', ''), if(parameters('deployAppService'), reference(resourceId('Microsoft.Web/sites', parameters('webAppName')), '2021-02-01').defaultHostName, parameters('botDomain')))]"
+    },
+    "BOT_ID": {
+      "type": "string",
+      "value": "[if(parameters('deployAppService'), reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))).clientId, parameters('aadAppClientId'))]"
+    },
+    "BOT_TENANT_ID": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('identityName'))).tenantId]"
+    },
+    "APIM_GATEWAY_URL": {
+      "type": "string",
+      "value": "[if(and(parameters('deployVNet'), parameters('deployAppService')), reference(resourceId('Microsoft.Resources/deployments', 'apim-deployment'), '2020-10-01').outputs.apimGatewayUrl.value, '')]"
+    },
+    "APIM_PUBLIC_IP": {
+      "type": "string",
+      "value": "[if(and(parameters('deployVNet'), parameters('deployAppService')), reference(resourceId('Microsoft.Resources/deployments', 'apim-deployment'), '2020-10-01').outputs.apimPublicIP.value, '')]"
+    },
+    "BOT_MESSAGES_ENDPOINT": {
+      "type": "string",
+      "value": "[if(and(parameters('deployVNet'), parameters('deployAppService')), reference(resourceId('Microsoft.Resources/deployments', 'apim-deployment'), '2020-10-01').outputs.botMessagesEndpoint.value, '')]"
+    },
+    "VNET_ID": {
+      "type": "string",
+      "value": "[if(parameters('deployVNet'), reference(resourceId('Microsoft.Resources/deployments', 'networking-deployment'), '2020-10-01').outputs.vnetId.value, '')]"
+    },
+    "FIREWALL_PRIVATE_IP": {
+      "type": "string",
+      "value": "[if(and(parameters('deployVNet'), parameters('deployFirewall')), reference(resourceId('Microsoft.Resources/deployments', 'firewall-deployment'), '2020-10-01').outputs.firewallPrivateIP.value, '')]"
+    },
+    "FIREWALL_PUBLIC_IP": {
+      "type": "string",
+      "value": "[if(and(parameters('deployVNet'), parameters('deployFirewall')), reference(resourceId('Microsoft.Resources/deployments', 'firewall-deployment'), '2020-10-01').outputs.firewallPublicIP.value, '')]"
+    },
+    "KEY_VAULT_NAME": {
+      "type": "string",
+      "value": "[if(parameters('deployKeyVault'), reference(resourceId('Microsoft.Resources/deployments', 'keyvault-deployment'), '2020-10-01').outputs.keyVaultName.value, '')]"
+    },
+    "KEY_VAULT_URI": {
+      "type": "string",
+      "value": "[if(parameters('deployKeyVault'), reference(resourceId('Microsoft.Resources/deployments', 'keyvault-deployment'), '2020-10-01').outputs.keyVaultUri.value, '')]"
+    },
+    "SSO_CERTIFICATE_NAME": {
+      "type": "string",
+      "value": "[if(parameters('deployKeyVault'), reference(resourceId('Microsoft.Resources/deployments', 'keyvault-deployment'), '2020-10-01').outputs.certificateName.value, '')]"
+    }
+  }
+}

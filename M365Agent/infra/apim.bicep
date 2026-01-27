@@ -40,7 +40,7 @@ param managedIdentityClientId string
 param managedIdentityResourceId string
 
 // Public IP for APIM
-resource apimPublicIP 'Microsoft.Network/publicIPAddresses@2023-05-01' = {
+resource apimPublicIP 'Microsoft.Network/publicIPAddresses@2021-05-01' = {
   name: '${resourceBaseName}-apim-pip'
   location: location
   sku: {
@@ -55,9 +55,9 @@ resource apimPublicIP 'Microsoft.Network/publicIPAddresses@2023-05-01' = {
 }
 
 // API Management Service
-resource apim 'Microsoft.ApiManagement/service@2023-05-01-preview' = {
-  name: '${resourceBaseName}-apim'
-  location: location
+resource apim 'Microsoft.ApiManagement/service@2021-08-01' = {
+name: '${resourceBaseName}-apim'
+location: location
   sku: {
     name: apimSku
     capacity: apimCapacity
@@ -89,7 +89,7 @@ resource apim 'Microsoft.ApiManagement/service@2023-05-01-preview' = {
 }
 
 // Backend for the Bot App Service
-resource botBackend 'Microsoft.ApiManagement/service/backends@2023-05-01-preview' = {
+resource botBackend 'Microsoft.ApiManagement/service/backends@2021-08-01' = {
   parent: apim
   name: 'travel-agent-bot-backend'
   properties: {
@@ -111,7 +111,7 @@ resource botBackend 'Microsoft.ApiManagement/service/backends@2023-05-01-preview
 }
 
 // API for Bot Messages Endpoint
-resource botApi 'Microsoft.ApiManagement/service/apis@2023-05-01-preview' = {
+resource botApi 'Microsoft.ApiManagement/service/apis@2021-08-01' = {
   parent: apim
   name: 'travel-agent-bot-api'
   properties: {
@@ -128,7 +128,7 @@ resource botApi 'Microsoft.ApiManagement/service/apis@2023-05-01-preview' = {
 }
 
 // Operation: POST /api/messages
-resource botMessagesOperation 'Microsoft.ApiManagement/service/apis/operations@2023-05-01-preview' = {
+resource botMessagesOperation 'Microsoft.ApiManagement/service/apis/operations@2021-08-01' = {
   parent: botApi
   name: 'post-messages'
   properties: {
@@ -163,8 +163,66 @@ resource botMessagesOperation 'Microsoft.ApiManagement/service/apis/operations@2
   }
 }
 
+// Operation: GET /api/health
+resource botHealthOperation 'Microsoft.ApiManagement/service/apis/operations@2021-08-01' = {
+  parent: botApi
+  name: 'get-health'
+  properties: {
+    displayName: 'Get Health'
+    method: 'GET'
+    urlTemplate: '/api/health'
+    description: 'Health check endpoint for monitoring'
+    responses: [
+      {
+        statusCode: 200
+        description: 'Healthy'
+      }
+    ]
+  }
+}
+
+// Operation: GET /mcp (Model Context Protocol discovery)
+resource botMcpOperation 'Microsoft.ApiManagement/service/apis/operations@2021-08-01' = {
+  parent: botApi
+  name: 'get-mcp'
+  properties: {
+    displayName: 'Get MCP Discovery'
+    method: 'GET'
+    urlTemplate: '/mcp'
+    description: 'Model Context Protocol discovery endpoint'
+    responses: [
+      {
+        statusCode: 200
+        description: 'Success'
+      }
+      {
+        statusCode: 404
+        description: 'Not Found (if backend doesn\'t implement MCP)'
+      }
+    ]
+  }
+}
+
+// Operation: GET / (root)
+resource botRootOperation 'Microsoft.ApiManagement/service/apis/operations@2021-08-01' = {
+  parent: botApi
+  name: 'get-root'
+  properties: {
+    displayName: 'Get Root'
+    method: 'GET'
+    urlTemplate: '/'
+    description: 'Root endpoint for health probes'
+    responses: [
+      {
+        statusCode: 200
+        description: 'Success'
+      }
+    ]
+  }
+}
+
 // Policy for Bot Messages Operation
-resource botMessagesPolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2023-05-01-preview' = {
+resource botMessagesPolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2021-08-01' = {
   parent: botMessagesOperation
   name: 'policy'
   properties: {
@@ -225,6 +283,82 @@ resource botMessagesPolicy 'Microsoft.ApiManagement/service/apis/operations/poli
   </on-error>
 </policies>
 ''', managedIdentityClientId, resourceBaseName)
+    format: 'xml'
+  }
+}
+
+// Simple policy for health, MCP, and root (no JWT validation needed)
+resource botHealthPolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2021-08-01' = {
+  parent: botHealthOperation
+  name: 'policy'
+  properties: {
+    value: '''
+<policies>
+  <inbound>
+    <base />
+    <set-backend-service backend-id="travel-agent-bot-backend" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>
+'''
+    format: 'xml'
+  }
+}
+
+resource botMcpPolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2021-08-01' = {
+  parent: botMcpOperation
+  name: 'policy'
+  properties: {
+    value: '''
+<policies>
+  <inbound>
+    <base />
+    <set-backend-service backend-id="travel-agent-bot-backend" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>
+'''
+    format: 'xml'
+  }
+}
+
+resource botRootPolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2021-08-01' = {
+  parent: botRootOperation
+  name: 'policy'
+  properties: {
+    value: '''
+<policies>
+  <inbound>
+    <base />
+    <set-backend-service backend-id="travel-agent-bot-backend" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>
+'''
     format: 'xml'
   }
 }
@@ -314,6 +448,7 @@ output apimId string = apim.id
 output apimName string = apim.name
 output apimGatewayUrl string = apim.properties.gatewayUrl
 output apimPublicIP string = apimPublicIP.properties.ipAddress
-output apimFQDN string = apimPublicIP.properties.dnsSettings.fqdn
+// Use gateway URL for bot endpoint (not public IP FQDN!)
+output apimFQDN string = apim.properties.gatewayUrl
 output apimManagedIdentityPrincipalId string = managedIdentityClientId
 output botMessagesEndpoint string = '${apim.properties.gatewayUrl}/api/messages'

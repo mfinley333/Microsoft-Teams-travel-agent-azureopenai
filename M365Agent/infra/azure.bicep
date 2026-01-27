@@ -27,11 +27,14 @@ param aadAppTenantId string = ''
 
 // VNet and APIM Parameters
 param deployVNet bool = true
+param deployFirewall bool = true
+param deployKeyVault bool = true
 param azureOpenAIResourceName string = 'aif-travelagent-bot'
 param azureOpenAIResourceGroup string = resourceGroup().name
 param publisherEmail string = 'admin@travelagent.com'
 param publisherName string = 'Travel Agent Bot'
 param apimSku string = 'Developer'
+param createRoleAssignment bool = false  // Set to false to skip if already exists
 
 param serverfarmsName string = resourceBaseName
 param webAppName string = resourceBaseName
@@ -43,20 +46,34 @@ resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' 
   name: identityName
 }
 
-// Reference existing Azure OpenAI resource
-resource openAIAccount 'Microsoft.CognitiveServices/accounts@2023-05-01' existing = {
-  name: azureOpenAIResourceName
-  scope: resourceGroup(azureOpenAIResourceGroup)
+// Deploy Key Vault for certificate-based SSO and secret storage
+module keyVault './keyvault.bicep' = if (deployKeyVault) {
+  name: 'keyvault-deployment'
+  params: {
+    resourceBaseName: resourceBaseName
+    location: location
+    managedIdentityPrincipalId: identity.properties.principalId
+    managedIdentityId: identity.id
+    tenantId: tenant().tenantId
+    deployPrivateEndpoint: deployVNet
+    privateEndpointSubnetId: deployVNet ? networking.outputs.privateEndpointsSubnetId : ''
+    vnetId: deployVNet ? networking.outputs.vnetId : ''
+    aadAppClientSecret: aadAppClientSecret // Pass client secret to be stored in KeyVault
+  }
+  dependsOn: [
+    networking
+  ]
 }
 
-// Role assignment: Grant Managed Identity access to Azure OpenAI
-resource openAIRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(identity.id, openAIAccount.id, 'Cognitive Services OpenAI User')
-  scope: openAIAccount
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd') // Cognitive Services OpenAI User
-    principalId: identity.properties.principalId
-    principalType: 'ServicePrincipal'
+// Role assignment: Grant Managed Identity access to Azure OpenAI (using module for cross-scope deployment)
+// Only create if createRoleAssignment is true (skip if already exists)
+module openAIRoleAssignment './roleAssignment.bicep' = if (createRoleAssignment) {
+  name: 'openai-role-assignment'
+  scope: resourceGroup(azureOpenAIResourceGroup)
+  params: {
+    openAIAccountName: azureOpenAIResourceName
+    managedIdentityPrincipalId: identity.properties.principalId
+    roleDefinitionId: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd' // Cognitive Services OpenAI User
   }
 }
 
@@ -90,7 +107,6 @@ resource webApp 'Microsoft.Web/sites@2021-02-01' = if (deployAppService) {
     serverFarmId: serverfarm.id
     httpsOnly: true
     virtualNetworkSubnetId: deployVNet ? networking.outputs.appServiceSubnetId : null
-    publicNetworkAccess: deployVNet ? 'Disabled' : 'Enabled'
     siteConfig: {
       alwaysOn: true
       netFrameworkVersion: 'v9.0'
@@ -140,12 +156,44 @@ resource webApp 'Microsoft.Web/sites@2021-02-01' = if (deployAppService) {
           value: identity.properties.clientId
         }
         {
+          name: 'Azure__KeyVaultUrl'
+          value: deployKeyVault ? keyVault.outputs.keyVaultUri : ''
+        }
+        {
+          name: 'Azure__SSOCertificateName'
+          value: deployKeyVault ? keyVault.outputs.certificateName : ''
+        }
+        {
+          name: 'Azure__ClientId'
+          value: aadAppClientId
+        }
+        {
+          name: 'Azure__TenantId'
+          value: tenant().tenantId
+        }
+        {
+          name: 'Azure__UseCertificateAuth'
+          value: deployKeyVault ? 'true' : 'false'
+        }
+        {
           name: 'WEBSITE_VNET_ROUTE_ALL'
           value: deployVNet ? '1' : '0'
         }
         {
           name: 'WEBSITE_DNS_SERVER'
           value: '168.63.129.16'
+        }
+        {
+          name: 'AAD_APP_CLIENT_ID'
+          value: aadAppClientId
+        }
+        {
+          name: 'AAD_APP_TENANT_ID'
+          value: !empty(aadAppTenantId) ? aadAppTenantId : tenant().tenantId
+        }
+        {
+          name: 'AAD_APP_CLIENT_SECRET'
+          value: deployKeyVault && !empty(aadAppClientSecret) ? '@Microsoft.KeyVault(SecretUri=${keyVault.outputs.aadAppSecretUri})' : ''
         }
       ]
     }
@@ -225,6 +273,21 @@ module apim './apim.bicep' = if (deployVNet && deployAppService) {
   ]
 }
 
+// Deploy Azure Firewall for outbound traffic control
+module firewall './firewall.bicep' = if (deployVNet && deployFirewall) {
+  name: 'firewall-deployment'
+  params: {
+    resourceBaseName: resourceBaseName
+    location: location
+    firewallSubnetId: networking.outputs.firewallSubnetId
+    firewallSku: 'Standard'
+    firewallTier: 'Standard'
+  }
+  dependsOn: [
+    networking
+  ]
+}
+
 // Register your web service as a bot with the Bot Framework
 module azureBotRegistration './botRegistration/azurebot.bicep' = {
   name: 'Azure-Bot-registration'
@@ -243,27 +306,6 @@ module azureBotRegistration './botRegistration/azurebot.bicep' = {
   }
 }
 
-// Deploy Private Endpoint for Bot Service (after Bot Service is created)
-// ?? DISABLED: Private Endpoint for Bot Service breaks Teams channel communication
-// Bot Service must be publicly accessible for Bot Framework Service to route messages from Teams
-// Private Endpoints are only for DirectLine Speech/WebChat scenarios, not Teams channels
-/*
-module botServicePrivateEndpoint './botservice-privateendpoint.bicep' = if (deployVNet) {
-  name: 'botservice-privateendpoint-deployment'
-  params: {
-    resourceBaseName: resourceBaseName
-    location: location
-    botServiceName: resourceBaseName
-    vnetId: networking.outputs.vnetId
-    privateEndpointsSubnetId: networking.outputs.privateEndpointsSubnetId
-    botServicePrivateDnsZoneId: networking.outputs.botServicePrivateDnsZoneId
-  }
-  dependsOn: [
-    azureBotRegistration
-    networking
-  ]
-}
-*/
 
 // The output will be persisted in .env.{envName}. Visit https://aka.ms/teamsfx-actions/arm-deploy for more details.
 output BOT_AZURE_APP_SERVICE_RESOURCE_ID string = deployAppService ? webApp.id : ''
@@ -274,5 +316,9 @@ output APIM_GATEWAY_URL string = deployVNet && deployAppService ? apim.outputs.a
 output APIM_PUBLIC_IP string = deployVNet && deployAppService ? apim.outputs.apimPublicIP : ''
 output BOT_MESSAGES_ENDPOINT string = deployVNet && deployAppService ? apim.outputs.botMessagesEndpoint : ''
 output VNET_ID string = deployVNet ? networking.outputs.vnetId : ''
-// output BOT_SERVICE_PRIVATE_ENDPOINT_ID string = deployVNet ? botServicePrivateEndpoint.outputs.botServicePrivateEndpointId : ''
-// ?? DISABLED: Bot Service Private Endpoint not used for Teams channels
+output FIREWALL_PRIVATE_IP string = deployVNet && deployFirewall ? firewall.outputs.firewallPrivateIP : ''
+output FIREWALL_PUBLIC_IP string = deployVNet && deployFirewall ? firewall.outputs.firewallPublicIP : ''
+output KEY_VAULT_NAME string = deployKeyVault ? keyVault.outputs.keyVaultName : ''
+output KEY_VAULT_URI string = deployKeyVault ? keyVault.outputs.keyVaultUri : ''
+output SSO_CERTIFICATE_NAME string = deployKeyVault ? keyVault.outputs.certificateName : ''
+

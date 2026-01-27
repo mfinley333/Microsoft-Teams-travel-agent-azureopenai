@@ -8,6 +8,7 @@ using Microsoft.Agents.Builder;
 using Microsoft.Agents.Storage;
 using Microsoft.Extensions.AI;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
@@ -16,8 +17,8 @@ builder.Services.AddHttpContextAccessor();
 builder.Logging.AddConsole();
 
 var config = builder.Configuration.Get<ConfigOptions>();
-var logger = builder.Logging.Services.BuildServiceProvider().GetRequiredService<ILogger<Program>>();
 
+// Configure services without calling BuildServiceProvider
 builder.Services.AddSingleton(serviceProvider =>
 {
     var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
@@ -41,7 +42,7 @@ builder.Services.AddSingleton(serviceProvider =>
             {
                 ExcludeEnvironmentCredential = false,
                 ExcludeManagedIdentityCredential = false,
-                ExcludeSharedTokenCacheCredential = true,
+                // ExcludeSharedTokenCacheCredential removed - property is obsolete
                 ExcludeVisualStudioCredential = true,
                 ExcludeVisualStudioCodeCredential = true,
                 ExcludeAzureCliCredential = true,

@@ -4,6 +4,12 @@
     <ProjectGuid>b069b3bd-f6bc-cc40-82ab-3fcc2ea50fdf</ProjectGuid>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="Bots\CertificateAuthBot.cs" />
+    <None Include="NUGET_PACKAGES_REQUIRED.md" />
+    <None Include="ProgramConfiguration.cs" />
+    <None Include="Services\CertificateSSOService.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectCapability Include="ProjectConfigurationsDeclaredDimensions" />
     <ProjectCapability Include="Copilot" />
   </ItemGroup>

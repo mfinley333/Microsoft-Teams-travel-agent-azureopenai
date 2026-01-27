@@ -5,6 +5,7 @@ using Microsoft.Agents.Builder.State;
 using Microsoft.Agents.Core.Models;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
 
 
 namespace TravelAgent.Bot;
@@ -13,13 +14,15 @@ public class TravelAgentBot : AgentApplication
 {
     private Agents.TravelAgent _travelAgent;
     private IChatClient _chatClient;
+    private IConfiguration _configuration;
 
-    public TravelAgentBot(AgentApplicationOptions options, IChatClient chatClient) : base(options)
+    public TravelAgentBot(AgentApplicationOptions options, IChatClient chatClient, IConfiguration configuration) : base(options)
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
 
         OnConversationUpdate(ConversationUpdateEvents.MembersAdded, WelcomeMessageAsync);
-        OnActivity(ActivityTypes.Message, MessageActivityAsync, rank: RouteRank.Last, autoSignInHandlers: ["graph"]);
+        OnActivity(ActivityTypes.Message, MessageActivityAsync, rank: RouteRank.Last);
     }
 
     protected async Task MessageActivityAsync(ITurnContext turnContext, ITurnState turnState, CancellationToken cancellationToken)
@@ -35,7 +38,7 @@ public class TravelAgentBot : AgentApplication
         await turnContext.StreamingResponse.QueueInformativeUpdateAsync("Working on a response for you");
 
         IList<ChatMessage> chatHistory = turnState.GetValue("conversation.chatHistory", () => new List<ChatMessage>());
-        _travelAgent = new Agents.TravelAgent(_chatClient, this, turnContext);
+        _travelAgent = new Agents.TravelAgent(_chatClient, this, turnContext, _configuration);
 
         // Invoke the TravelAgent to process the message
         TravelAgentResponse travelResponse = await _travelAgent.InvokeAgentAsync(turnContext.Activity.Text, chatHistory);

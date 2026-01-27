@@ -18,6 +18,7 @@
     <PackageReference Include="Microsoft.Graph" Version="5.95.0" />
     <PackageReference Include="Microsoft.Agents.Authentication.Msal" Version="1.*" />
     <PackageReference Include="Microsoft.Agents.Hosting.AspNetCore" Version="1.*" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.76.0" />
   </ItemGroup>
 
   <!-- Exclude local settings from publish -->
