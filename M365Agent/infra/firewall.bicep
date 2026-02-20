@@ -122,9 +122,8 @@ resource appRuleCollectionGroup 'Microsoft.Network/firewallPolicies/ruleCollecti
             ]
             fqdnTags: []
             targetFqdns: [
-              'token.botframework.com'
-              'api.botframework.com'
-              'login.botframework.com'
+              'api.botframework.com'           // Bot channel service messaging
+              'smba.trafficmanager.net'      // Bot service traffic manager
             ]
             sourceAddresses: [
               '10.0.0.0/16'
