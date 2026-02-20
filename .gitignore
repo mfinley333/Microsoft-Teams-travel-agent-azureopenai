@@ -231,3 +231,6 @@ build/
 
 # User-specific development settings
 appsettings.Development.json
+/AAD_REDIRECT_URIS_EXPLAINED.md
+/AUTHORIZATION_CODE_FLOW_WITH_PKCE.md
+/GIT_PUSH_SUCCESS_SUMMARY.md
